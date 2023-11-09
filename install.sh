@@ -62,19 +62,19 @@ function print_error() {
 
 function is_root() {
   if [[ 0 == "$UID" ]]; then
-    print_ok "当前用户是 root 用户，开始安装流程"
+    print_ok "Pengguna saat ini adalah root, mulai proses penginstalan"
   else
-    print_error "当前用户不是 root 用户，请切换到 root 用户后重新执行脚本"
+    print_error "Pengguna saat ini bukan pengguna root, silakan beralih ke pengguna root dan jalankan kembali skrip."
     exit 1
   fi
 }
 
 judge() {
   if [[ 0 -eq $? ]]; then
-    print_ok "$1 完成"
+    print_ok "$1 memenuhi"
     sleep 1
   else
-    print_error "$1 失败"
+    print_error "$1 gagal (misalnya percobaan)"
     exit 1
   fi
 }
@@ -83,18 +83,18 @@ function system_check() {
   source '/etc/os-release'
 
   if [[ "${ID}" == "centos" && ${VERSION_ID} -ge 7 ]]; then
-    print_ok "当前系统为 Centos ${VERSION_ID} ${VERSION}"
+    print_ok "Sistem saat ini adalah Centos ${VERSION_ID} ${VERSION}"
     INS="yum install -y"
     ${INS} wget
     wget -N -P /etc/yum.repos.d/ https://raw.githubusercontent.com/wulabing/Xray_onekey/${github_branch}/basic/nginx.repo
 
 
   elif [[ "${ID}" == "ol" ]]; then
-    print_ok "当前系统为 Oracle Linux ${VERSION_ID} ${VERSION}"
+    print_ok "Sistem saat ini adalah Oracle Linux ${VERSION_ID} ${VERSION}"
     INS="yum install -y"
     wget -N -P /etc/yum.repos.d/ https://raw.githubusercontent.com/wulabing/Xray_onekey/${github_branch}/basic/nginx.repo
   elif [[ "${ID}" == "debian" && ${VERSION_ID} -ge 9 ]]; then
-    print_ok "当前系统为 Debian ${VERSION_ID} ${VERSION}"
+    print_ok "Sistem saat ini adalah Debian ${VERSION_ID} ${VERSION}"
     INS="apt install -y"
     # 清除可能的遗留问题
     rm -f /etc/apt/sources.list.d/nginx.list
@@ -111,7 +111,7 @@ function system_check() {
     apt update
 
   elif [[ "${ID}" == "ubuntu" && $(echo "${VERSION_ID}" | cut -d '.' -f1) -ge 18 ]]; then
-    print_ok "当前系统为 Ubuntu ${VERSION_ID} ${UBUNTU_CODENAME}"
+    print_ok "Sistem saat ini adalah Ubuntu ${VERSION_ID} ${UBUNTU_CODENAME}"
     INS="apt install -y"
     # 清除可能的遗留问题
     rm -f /etc/apt/sources.list.d/nginx.list
@@ -127,7 +127,7 @@ function system_check() {
 
     apt update
   else
-    print_error "当前系统为 ${ID} ${VERSION_ID} 不在支持的系统列表内"
+    print_error "Sistem saat ini adalah ${ID} ${VERSION_ID} Tidak ada dalam daftar sistem yang didukung"
     exit 1
   fi
 
@@ -149,23 +149,23 @@ function system_check() {
 function nginx_install() {
   if ! command -v nginx >/dev/null 2>&1; then
     ${INS} nginx
-    judge "Nginx 安装"
+    judge "Nginx pemasangan"
   else
-    print_ok "Nginx 已存在"
+    print_ok "Nginx sudah ada sebelumnya"
   fi
   # 遗留问题处理
   mkdir -p /etc/nginx/conf.d >/dev/null 2>&1
 }
 function dependency_install() {
   ${INS} lsof tar
-  judge "安装 lsof tar"
+  judge "pemasangan lsof tar"
 
   if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
     ${INS} crontabs
   else
     ${INS} cron
   fi
-  judge "安装 crontab"
+  judge "pemasangan crontab"
 
   if [[ "${ID}" == "centos" || "${ID}" == "ol" ]]; then
     touch /var/spool/cron/root && chmod 600 /var/spool/cron/root
@@ -175,17 +175,17 @@ function dependency_install() {
     systemctl start cron && systemctl enable cron
 
   fi
-  judge "crontab 自启动配置 "
+  judge "crontab Konfigurasi memulai sendiri "
 
   ${INS} unzip
-  judge "安装 unzip"
+  judge "pemasangan unzip"
 
   ${INS} curl
-  judge "安装 curl"
+  judge "pemasangan curl"
 
   # upgrade systemd
   ${INS} systemd
-  judge "安装/升级 systemd"
+  judge "Instalasi/peningkatan systemd"
 
   # Nginx 后置 无需编译 不再需要
   #  if [[ "${ID}" == "centos" ||  "${ID}" == "ol" ]]; then
@@ -232,43 +232,43 @@ function basic_optimization() {
 }
 
 function domain_check() {
-  read -rp "请输入你的域名信息(eg: www.wulabing.com):" domain
+  read -rp "Silakan masukkan informasi nama domain Anda(eg: www.wulabing.com):" domain
   domain_ip=$(curl -sm8 ipget.net/?ip="${domain}")
-  print_ok "正在获取 IP 地址信息，请耐心等待"
+  print_ok "Mengambil informasi alamat IP, harap menunggu dengan sabar"
   wgcfv4_status=$(curl -s4m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
   wgcfv6_status=$(curl -s6m8 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
   if [[ ${wgcfv4_status} =~ "on"|"plus" ]] || [[ ${wgcfv6_status} =~ "on"|"plus" ]]; then
     # 关闭wgcf-warp，以防误判VPS IP情况
     wg-quick down wgcf >/dev/null 2>&1
-    print_ok "已关闭 wgcf-warp"
+    print_ok "Ditutup wgcf-warp"
   fi
   local_ipv4=$(curl -4 ip.sb)
   local_ipv6=$(curl -6 ip.sb)
   if [[ -z ${local_ipv4} && -n ${local_ipv6} ]]; then
     # 纯IPv6 VPS，自动添加DNS64服务器以备acme.sh申请证书使用
     echo -e nameserver 2a01:4f8:c2c:123f::1 > /etc/resolv.conf
-    print_ok "识别为 IPv6 Only 的 VPS，自动添加 DNS64 服务器"
+    print_ok "mengidentifikasi sebagai IPv6 Only 的 VPS，Tambah Otomatis DNS64 server"
   fi
-  echo -e "域名通过 DNS 解析的 IP 地址：${domain_ip}"
-  echo -e "本机公网 IPv4 地址： ${local_ipv4}"
-  echo -e "本机公网 IPv6 地址： ${local_ipv6}"
+  echo -e "Nama domain diselesaikan melalui DNS ke alamat IP：${domain_ip}"
+  echo -e "Alamat IPv4 publik lokal： ${local_ipv4}"
+  echo -e "Alamat IPv6 publik lokal： ${local_ipv6}"
   sleep 2
   if [[ ${domain_ip} == "${local_ipv4}" ]]; then
-    print_ok "域名通过 DNS 解析的 IP 地址与 本机 IPv4 地址匹配"
+    print_ok "Alamat IP nama domain yang diselesaikan melalui DNS cocok dengan alamat IPv4 asli"
     sleep 2
   elif [[ ${domain_ip} == "${local_ipv6}" ]]; then
-    print_ok "域名通过 DNS 解析的 IP 地址与 本机 IPv6 地址匹配"
+    print_ok "Alamat IP nama domain yang diselesaikan melalui DNS cocok dengan alamat IPv6 asli"
     sleep 2
   else
-    print_error "请确保域名添加了正确的 A / AAAA 记录，否则将无法正常使用 xray"
-    print_error "域名通过 DNS 解析的 IP 地址与 本机 IPv4 / IPv6 地址不匹配，是否继续安装？（y/n）" && read -r install
+    print_error "Harap pastikan nama domain telah menambahkan data A/AAAA yang benar, jika tidak, xray tidak akan berfungsi dengan benar"
+    print_error "Alamat IP nama domain yang diselesaikan melalui DNS tidak cocok dengan alamat IPv4/IPv6 lokal. Apakah Anda ingin melanjutkan instalasi?？（y/n）" && read -r install
     case $install in
     [yY][eE][sS] | [yY])
-      print_ok "继续安装"
+      print_ok "Lanjutkan instalasi"
       sleep 2
       ;;
     *)
-      print_error "安装终止"
+      print_error "Instalasi dihentikan"
       exit 2
       ;;
     esac
@@ -277,35 +277,35 @@ function domain_check() {
 
 function port_exist_check() {
   if [[ 0 -eq $(lsof -i:"$1" | grep -i -c "listen") ]]; then
-    print_ok "$1 端口未被占用"
+    print_ok "$1 Port tidak ditempati"
     sleep 1
   else
-    print_error "检测到 $1 端口被占用，以下为 $1 端口占用信息"
+    print_error "terdeteksi $1 Port ditempati，mengikuti $1 Informasi Penggunaan Port"
     lsof -i:"$1"
-    print_error "5s 后将尝试自动 kill 占用进程"
+    print_error "5s Setelah itu, ia akan mencoba membunuh proses yang ditempati secara otomatis"
     sleep 5
     lsof -i:"$1" | awk '{print $2}' | grep -v "PID" | xargs kill -9
-    print_ok "kill 完成"
+    print_ok "kill memenuhi"
     sleep 1
   fi
 }
 function update_sh() {
   ol_version=$(curl -L -s https://raw.githubusercontent.com/wulabing/Xray_onekey/${github_branch}/install.sh | grep "shell_version=" | head -1 | awk -F '=|"' '{print $3}')
   if [[ "$shell_version" != "$(echo -e "$shell_version\n$ol_version" | sort -rV | head -1)" ]]; then
-    print_ok "存在新版本，是否更新 [Y/N]?"
+    print_ok "Ada versi baru, apakah sudah diperbarui [Y/N]?"
     read -r update_confirm
     case $update_confirm in
     [yY][eE][sS] | [yY])
       wget -N --no-check-certificate https://raw.githubusercontent.com/wulabing/Xray_onekey/${github_branch}/install.sh
-      print_ok "更新完成"
-      print_ok "您可以通过 bash $0 执行本程序"
+      print_ok "Pembaruan selesai"
+      print_ok "Anda dapat melakukan ini dengan bash $0 Penerapan prosedur ini"
       exit 0
       ;;
     *) ;;
     esac
   else
-    print_ok "当前版本为最新版本"
-    print_ok "您可以通过 bash $0 执行本程序"
+    print_ok "Versi saat ini adalah versi terbaru"
+    print_ok "Anda dapat melakukan ini dengan bash $0 Implementasi prosedur ini"
   fi
 }
 
@@ -313,7 +313,7 @@ function xray_tmp_config_file_check_and_use() {
   if [[ -s ${xray_conf_dir}/config_tmp.json ]]; then
     mv -f ${xray_conf_dir}/config_tmp.json ${xray_conf_dir}/config.json
   else
-    print_error "xray 配置文件修改异常"
+    print_error "xray Pengecualian modifikasi file konfigurasi"
   fi
 }
 
@@ -321,48 +321,48 @@ function modify_UUID() {
   [ -z "$UUID" ] && UUID=$(cat /proc/sys/kernel/random/uuid)
   cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",0,"settings","clients",0,"id"];"'${UUID}'")' >${xray_conf_dir}/config_tmp.json
   xray_tmp_config_file_check_and_use
-  judge "Xray TCP UUID 修改"
+  judge "Xray TCP UUID modifikasi"
 }
 
 function modify_UUID_ws() {
   cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",1,"settings","clients",0,"id"];"'${UUID}'")' >${xray_conf_dir}/config_tmp.json
   xray_tmp_config_file_check_and_use
-  judge "Xray ws UUID 修改"
+  judge "Xray ws UUID modifikasi"
 }
 
 function modify_fallback_ws() {
   cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",0,"settings","fallbacks",2,"path"];"'${WS_PATH}'")' >${xray_conf_dir}/config_tmp.json
   xray_tmp_config_file_check_and_use
-  judge "Xray fallback_ws 修改"
+  judge "Xray fallback_ws modifikasi"
 }
 
 function modify_ws() {
   cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",1,"streamSettings","wsSettings","path"];"'${WS_PATH}'")' >${xray_conf_dir}/config_tmp.json
   xray_tmp_config_file_check_and_use
-  judge "Xray ws 修改"
+  judge "Xray ws modifikasi"
 }
 
 function configure_nginx() {
   nginx_conf="/etc/nginx/conf.d/${domain}.conf"
   cd /etc/nginx/conf.d/ && rm -f ${domain}.conf && wget -O ${domain}.conf https://raw.githubusercontent.com/wulabing/Xray_onekey/${github_branch}/config/web.conf
   sed -i "s/xxx/${domain}/g" ${nginx_conf}
-  judge "Nginx 配置 修改"
+  judge "Nginx Modifikasi Konfigurasi"
   
   systemctl enable nginx
   systemctl restart nginx
 }
 
 function modify_port() {
-  read -rp "请输入端口号(默认：443)：" PORT
+  read -rp "Masukkan nomor port (default：443)：" PORT
   [ -z "$PORT" ] && PORT="443"
   if [[ $PORT -le 0 ]] || [[ $PORT -gt 65535 ]]; then
-    print_error "请输入 0-65535 之间的值"
+    print_error "Masukkan nilai antara 0 dan 65535"
     exit 1
   fi
   port_exist_check $PORT
   cat ${xray_conf_dir}/config.json | jq 'setpath(["inbounds",0,"port"];'${PORT}')' >${xray_conf_dir}/config_tmp.json
   xray_tmp_config_file_check_and_use
-  judge "Xray 端口 修改"
+  judge "Xray Modifikasi Port"
 }
 
 function configure_xray() {
@@ -381,13 +381,13 @@ function configure_xray_ws() {
 }
 
 function xray_install() {
-  print_ok "安装 Xray"
+  print_ok "pemasangan Xray"
   curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh | bash -s -- install
-  judge "Xray 安装"
+  judge "Xray pemasangan"
 
   # 用于生成 Xray 的导入链接
   echo $domain >$domain_tmp_dir/domain
-  judge "域名记录"
+  judge "Catatan Domain"
 }
 
 function ssl_install() {
@@ -400,7 +400,7 @@ function ssl_install() {
   #  judge "安装 SSL 证书生成脚本依赖"
 
   curl -L https://get.acme.sh | bash
-  judge "安装 SSL 证书生成脚本"
+  judge "Menginstal Skrip Pembuatan Sertifikat SSL"
 }
 
 function acme() {
@@ -411,33 +411,33 @@ function acme() {
   systemctl restart nginx
 
   if "$HOME"/.acme.sh/acme.sh --issue --insecure -d "${domain}" --webroot "$website_dir" -k ec-256 --force; then
-    print_ok "SSL 证书生成成功"
+    print_ok "SSL Pembuatan Sertifikat Berhasil"
     sleep 2
     if "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --reloadcmd "systemctl restart xray" --ecc --force; then
-      print_ok "SSL 证书配置成功"
+      print_ok "SSL Konfigurasi Sertifikat Berhasil"
       sleep 2
       if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
         wg-quick up wgcf >/dev/null 2>&1
-        print_ok "已启动 wgcf-warp"
+        print_ok "diaktifkan wgcf-warp"
       fi
     fi
   elif "$HOME"/.acme.sh/acme.sh --issue --insecure -d "${domain}" --webroot "$website_dir" -k ec-256 --force --listen-v6; then
-    print_ok "SSL 证书生成成功"
+    print_ok "SSL Pembuatan Sertifikat Berhasil"
     sleep 2
     if "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --reloadcmd "systemctl restart xray" --ecc --force; then
-      print_ok "SSL 证书配置成功"
+      print_ok "SSL Konfigurasi Sertifikat Berhasil"
       sleep 2
       if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
         wg-quick up wgcf >/dev/null 2>&1
-        print_ok "已启动 wgcf-warp"
+        print_ok "diaktifkan wgcf-warp"
       fi
     fi
   else
-    print_error "SSL 证书生成失败"
+    print_error "SSL Kegagalan Pembuatan Sertifikat"
     rm -rf "$HOME/.acme.sh/${domain}_ecc"
     if [[ -n $(type -P wgcf) && -n $(type -P wg-quick) ]]; then
       wg-quick up wgcf >/dev/null 2>&1
-      print_ok "已启动 wgcf-warp"
+      print_ok "diaktifkan wgcf-warp"
     fi
     exit 1
   fi
@@ -450,13 +450,13 @@ function ssl_judge_and_install() {
 
   mkdir -p /ssl >/dev/null 2>&1
   if [[ -f "/ssl/xray.key" || -f "/ssl/xray.crt" ]]; then
-    print_ok "/ssl 目录下证书文件已存在"
-    print_ok "是否删除 /ssl 目录下的证书文件 [Y/N]?"
+    print_ok "/ssl File sertifikat sudah ada di direktori"
+    print_ok "Menghapus atau tidak /ssl File sertifikat dalam direktori [Y/N]?"
     read -r ssl_delete
     case $ssl_delete in
     [yY][eE][sS] | [yY])
       rm -rf /ssl/*
-      print_ok "已删除"
+      print_ok "dihapus"
       ;;
     *) ;;
 
@@ -464,11 +464,11 @@ function ssl_judge_and_install() {
   fi
 
   if [[ -f "/ssl/xray.key" || -f "/ssl/xray.crt" ]]; then
-    echo "证书文件已存在"
+    echo "File sertifikat sudah ada"
   elif [[ -f "$HOME/.acme.sh/${domain}_ecc/${domain}.key" && -f "$HOME/.acme.sh/${domain}_ecc/${domain}.cer" ]]; then
-    echo "证书文件已存在"
+    echo "File sertifikat sudah ada"
     "$HOME"/.acme.sh/acme.sh --installcert -d "${domain}" --fullchainpath /ssl/xray.crt --keypath /ssl/xray.key --ecc
-    judge "证书启用"
+    judge "Pemberdayaan Sertifikat"
   else
     mkdir /ssl
     cp -a $cert_dir/self_signed_cert.pem /ssl/xray.crt
@@ -489,8 +489,8 @@ function generate_certificate() {
   fi
   echo $signedcert | jq '.certificate[]' | sed 's/\"//g' | tee $cert_dir/self_signed_cert.pem
   echo $signedcert | jq '.key[]' | sed 's/\"//g' >$cert_dir/self_signed_key.pem
-  openssl x509 -in $cert_dir/self_signed_cert.pem -noout || (print_error "生成自签名证书失败" && exit 1)
-  print_ok "生成自签名证书成功"
+  openssl x509 -in $cert_dir/self_signed_cert.pem -noout || (print_error "Gagal menghasilkan sertifikat yang ditandatangani sendiri" && exit 1)
+  print_ok "Sertifikat yang ditandatangani sendiri berhasil dibuat"
   chown nobody.$cert_group $cert_dir/self_signed_cert.pem
   chown nobody.$cert_group $cert_dir/self_signed_key.pem
 }
@@ -498,13 +498,13 @@ function generate_certificate() {
 function configure_web() {
   rm -rf /www/xray_web
   mkdir -p /www/xray_web
-  print_ok "是否配置伪装网页？[Y/N]"
+  print_ok "Apakah akan mengonfigurasi halaman penyamaran？[Y/N]"
   read -r webpage
   case $webpage in
   [yY][eE][sS] | [yY])
     wget -O web.tar.gz https://raw.githubusercontent.com/wulabing/Xray_onekey/main/basic/web.tar.gz
     tar xzf web.tar.gz -C /www/xray_web
-    judge "站点伪装"
+    judge "Kamuflase situs"
     rm -f web.tar.gz
     ;;
   *) ;;
@@ -514,7 +514,7 @@ function configure_web() {
 function xray_uninstall() {
   curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh | bash -s -- remove --purge
   rm -rf $website_dir
-  print_ok "是否卸载nginx [Y/N]?"
+  print_ok "Apakah akan menghapus instalasi nginx [Y/N]?"
   read -r uninstall_nginx
   case $uninstall_nginx in
   [yY][eE][sS] | [yY])
@@ -526,7 +526,7 @@ function xray_uninstall() {
     ;;
   *) ;;
   esac
-  print_ok "是否卸载acme.sh [Y/N]?"
+  print_ok "Apakah akan menghapus instalasi acme.sh [Y/N]?"
   read -r uninstall_acme
   case $uninstall_acme in
   [yY][eE][sS] | [yY])
@@ -536,15 +536,15 @@ function xray_uninstall() {
     ;;
   *) ;;
   esac
-  print_ok "卸载完成"
+  print_ok "Pencopotan pemasangan selesai"
   exit 0
 }
 
 function restart_all() {
   systemctl restart nginx
-  judge "Nginx 启动"
+  judge "Nginx aktifkan (sebuah rencana)"
   systemctl restart xray
-  judge "Xray 启动"
+  judge "Xray aktifkan (sebuah rencana)"
 }
 
 function vless_xtls-rprx-vision_link() {
@@ -553,16 +553,16 @@ function vless_xtls-rprx-vision_link() {
   FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
   DOMAIN=$(cat ${domain_tmp_dir}/domain)
 
-  print_ok "URL 链接 (VLESS + TCP + TLS)"
+  print_ok "URL link (VLESS + TCP + TLS)"
   print_ok "vless://$UUID@$DOMAIN:$PORT?security=tls&flow=$FLOW#TLS_wulabing-$DOMAIN"
 
-  print_ok "URL 链接 (VLESS + TCP + XTLS)"
+  print_ok "URL link (VLESS + TCP + XTLS)"
   print_ok "vless://$UUID@$DOMAIN:$PORT?security=xtls&flow=$FLOW#XTLS_wulabing-$DOMAIN"
   print_ok "-------------------------------------------------"
-  print_ok "URL 二维码 (VLESS + TCP + TLS) （请在浏览器中访问）"
+  print_ok "URL barcode (VLESS + TCP + TLS) （Silakan kunjungi di browser Anda）"
   print_ok "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=vless://$UUID@$DOMAIN:$PORT?security=tls%26flow=$FLOW%23TLS_wulabing-$DOMAIN"
 
-  print_ok "URL 二维码 (VLESS + TCP + XTLS) （请在浏览器中访问）"
+  print_ok "URL barcode (VLESS + TCP + XTLS) （Silakan kunjungi di browser Anda）"
   print_ok "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=vless://$UUID@$DOMAIN:$PORT?security=xtls%26flow=$FLOW%23XTLS_wulabing-$DOMAIN"
 }
 
@@ -572,15 +572,15 @@ function vless_xtls-rprx-vision_information() {
   FLOW=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.clients[0].flow | tr -d '"')
   DOMAIN=$(cat ${domain_tmp_dir}/domain)
 
-  echo -e "${Red} Xray 配置信息 ${Font}"
-  echo -e "${Red} 地址（address）:${Font}  $DOMAIN"
-  echo -e "${Red} 端口（port）：${Font}  $PORT"
-  echo -e "${Red} 用户 ID（UUID）：${Font} $UUID"
-  echo -e "${Red} 流控（flow）：${Font} $FLOW"
-  echo -e "${Red} 加密方式（security）：${Font} none "
-  echo -e "${Red} 传输协议（network）：${Font} tcp "
-  echo -e "${Red} 伪装类型（type）：${Font} none "
-  echo -e "${Red} 底层传输安全：${Font} xtls 或 tls"
+  echo -e "${Red} Xray informasi konfigurasi ${Font}"
+  echo -e "${Red} alamat（address）:${Font}  $DOMAIN"
+  echo -e "${Red} pelabuhan（port）：${Font}  $PORT"
+  echo -e "${Red} pengguna ID（UUID）：${Font} $UUID"
+  echo -e "${Red} kontrol aliran（flow）：${Font} $FLOW"
+  echo -e "${Red} metode enkripsi（security）：${Font} none "
+  echo -e "${Red} protokol transportasi（network）：${Font} tcp "
+  echo -e "${Red} Jenis kamuflase（type）：${Font} none "
+  echo -e "${Red} Keamanan Transportasi：${Font} xtls 或 tls"
 }
 
 function ws_information() {
@@ -590,15 +590,15 @@ function ws_information() {
   WS_PATH=$(cat ${xray_conf_dir}/config.json | jq .inbounds[0].settings.fallbacks[2].path | tr -d '"')
   DOMAIN=$(cat ${domain_tmp_dir}/domain)
 
-  echo -e "${Red} Xray 配置信息 ${Font}"
-  echo -e "${Red} 地址（address）:${Font}  $DOMAIN"
-  echo -e "${Red} 端口（port）：${Font}  $PORT"
-  echo -e "${Red} 用户 ID（UUID）：${Font} $UUID"
-  echo -e "${Red} 加密方式（security）：${Font} none "
-  echo -e "${Red} 传输协议（network）：${Font} ws "
-  echo -e "${Red} 伪装类型（type）：${Font} none "
-  echo -e "${Red} 路径（path）：${Font} $WS_PATH "
-  echo -e "${Red} 底层传输安全：${Font} tls "
+  echo -e "${Red} Xray informasi konfigurasi ${Font}"
+  echo -e "${Red} alamat（address）:${Font}  $DOMAIN"
+  echo -e "${Red} pelabuhan（port）：${Font}  $PORT"
+  echo -e "${Red} pengguna ID（UUID）：${Font} $UUID"
+  echo -e "${Red} metode enkripsi（security）：${Font} none "
+  echo -e "${Red} protokol transportasi（network）：${Font} ws "
+  echo -e "${Red} Jenis kamuflase（type）：${Font} none "
+  echo -e "${Red} path（path）：${Font} $WS_PATH "
+  echo -e "${Red} Keamanan Transportasi：${Font} tls "
 }
 
 function ws_link() {
@@ -609,33 +609,33 @@ function ws_link() {
   WS_PATH_WITHOUT_SLASH=$(echo $WS_PATH | tr -d '/')
   DOMAIN=$(cat ${domain_tmp_dir}/domain)
 
-  print_ok "URL 链接 (VLESS + TCP + TLS)"
+  print_ok "URL link (VLESS + TCP + TLS)"
   print_ok "vless://$UUID@$DOMAIN:$PORT?security=tls#TLS_wulabing-$DOMAIN"
 
-  print_ok "URL 链接 (VLESS + TCP + XTLS)"
+  print_ok "URL link (VLESS + TCP + XTLS)"
   print_ok "vless://$UUID@$DOMAIN:$PORT?security=xtls&flow=$FLOW#XTLS_wulabing-$DOMAIN"
 
-  print_ok "URL 链接 (VLESS + WebSocket + TLS)"
+  print_ok "URL link (VLESS + WebSocket + TLS)"
   print_ok "vless://$UUID@$DOMAIN:$PORT?type=ws&security=tls&path=%2f${WS_PATH_WITHOUT_SLASH}%2f#WS_TLS_wulabing-$DOMAIN"
   print_ok "-------------------------------------------------"
-  print_ok "URL 二维码 (VLESS + TCP + TLS) （请在浏览器中访问）"
+  print_ok "URL barcode (VLESS + TCP + TLS) （Silakan kunjungi di browser Anda）"
   print_ok "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=vless://$UUID@$DOMAIN:$PORT?security=tls%23TLS_wulabing-$DOMAIN"
 
-  print_ok "URL 二维码 (VLESS + TCP + XTLS) （请在浏览器中访问）"
+  print_ok "URL barcode (VLESS + TCP + XTLS) （Silakan kunjungi di browser Anda）"
   print_ok "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=vless://$UUID@$DOMAIN:$PORT?security=xtls%26flow=$FLOW%23XTLS_wulabing-$DOMAIN"
 
-  print_ok "URL 二维码 (VLESS + WebSocket + TLS) （请在浏览器中访问）"
+  print_ok "URL barcode (VLESS + WebSocket + TLS) （Silakan kunjungi di browser Anda）"
   print_ok "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=vless://$UUID@$DOMAIN:$PORT?type=ws%26security=tls%26path=%2f${WS_PATH_WITHOUT_SLASH}%2f%23WS_TLS_wulabing-$DOMAIN"
 }
 
 function basic_information() {
-  print_ok "VLESS+TCP+XTLS+Nginx 安装成功"
+  print_ok "VLESS+TCP+XTLS+Nginx Instalasi berhasil"
   vless_xtls-rprx-vision_information
   vless_xtls-rprx-vision_link
 }
 
 function basic_ws_information() {
-  print_ok "VLESS+TCP+TLS+Nginx with WebSocket 混合模式 安装成功"
+  print_ok "VLESS+TCP+TLS+Nginx with WebSocket Instalasi Mode Campuran Berhasil"
   ws_information
   print_ok "————————————————————————"
   vless_xtls-rprx-vision_information
@@ -643,11 +643,11 @@ function basic_ws_information() {
 }
 
 function show_access_log() {
-  [ -f ${xray_access_log} ] && tail -f ${xray_access_log} || echo -e "${RedBG}log 文件不存在${Font}"
+  [ -f ${xray_access_log} ] && tail -f ${xray_access_log} || echo -e "${RedBG}log File tidak ada${Font}"
 }
 
 function show_error_log() {
-  [ -f ${xray_error_log} ] && tail -f ${xray_error_log} || echo -e "${RedBG}log 文件不存在${Font}"
+  [ -f ${xray_error_log} ] && tail -f ${xray_error_log} || echo -e "${RedBG}log File tidak ada${Font}"
 }
 
 function bbr_boost_sh() {
@@ -696,33 +696,33 @@ function install_xray_ws() {
 menu() {
   update_sh
   shell_mode_check
-  echo -e "\t Xray 安装管理脚本 ${Red}[${shell_version}]${Font}"
+  echo -e "\t Xray Skrip Manajemen Instalasi ${Red}[${shell_version}]${Font}"
   echo -e "\t---authored by wulabing---"
   echo -e "\thttps://github.com/wulabing\n"
 
-  echo -e "当前已安装版本：${shell_mode}"
+  echo -e "Versi yang saat ini diinstal：${shell_mode}"
   echo -e "—————————————— 安装向导 ——————————————"""
-  echo -e "${Green}0.${Font}  升级 脚本"
-  echo -e "${Green}1.${Font}  安装 Xray (VLESS + TCP + XTLS / TLS + Nginx)"
-  echo -e "${Green}2.${Font}  安装 Xray (VLESS + TCP + XTLS / TLS + Nginx 及 VLESS + TCP + TLS + Nginx + WebSocket 回落并存模式)"
-  echo -e "—————————————— 配置变更 ——————————————"
-  echo -e "${Green}11.${Font} 变更 UUID"
-  echo -e "${Green}13.${Font} 变更 连接端口"
-  echo -e "${Green}14.${Font} 变更 WebSocket PATH"
-  echo -e "—————————————— 查看信息 ——————————————"
-  echo -e "${Green}21.${Font} 查看 实时访问日志"
-  echo -e "${Green}22.${Font} 查看 实时错误日志"
-  echo -e "${Green}23.${Font} 查看 Xray 配置链接"
+  echo -e "${Green}0.${Font}  Tingkatkan Skrip"
+  echo -e "${Green}1.${Font}  pemasangan Xray (VLESS + TCP + XTLS / TLS + Nginx)"
+  echo -e "${Green}2.${Font}  pemasangan Xray (VLESS + TCP + XTLS / TLS + Nginx hingga VLESS + TCP + TLS + Nginx + WebSocket Pola kemunduran dan pola yang hidup berdampingan)"
+  echo -e "—————————————— Perubahan konfigurasi ——————————————"
+  echo -e "${Green}11.${Font} memodifikasi UUID"
+  echo -e "${Green}13.${Font} memodifikasi port koneksi"
+  echo -e "${Green}14.${Font} memodifikasi WebSocket PATH"
+  echo -e "—————————————— Lihat Informasi ——————————————"
+  echo -e "${Green}21.${Font} Lihat Log Akses Langsung"
+  echo -e "${Green}22.${Font} Melihat log kesalahan waktu nyata"
+  echo -e "${Green}23.${Font} Lihat Tautan Konfigurasi Xray"
   #    echo -e "${Green}23.${Font}  查看 V2Ray 配置信息"
-  echo -e "—————————————— 其他选项 ——————————————"
-  echo -e "${Green}31.${Font} 安装 4 合 1 BBR、锐速安装脚本"
-  echo -e "${Yellow}32.${Font} 安装 MTproxy （不推荐使用,请相关用户关闭或卸载）"
-  echo -e "${Green}33.${Font} 卸载 Xray"
-  echo -e "${Green}34.${Font} 更新 Xray-core"
-  echo -e "${Green}35.${Font} 安装 Xray-core 测试版 (Pre)"
-  echo -e "${Green}36.${Font} 手动更新 SSL 证书"
-  echo -e "${Green}40.${Font} 退出"
-  read -rp "请输入数字：" menu_num
+  echo -e "—————————————— Opsi lainnya ——————————————"
+  echo -e "${Green}31.${Font} Pemasangan BBR 4-in-1, Skrip Pemasangan yang Tajam"
+  echo -e "${Yellow}32.${Font} pemasangan MTproxy （Tidak disarankan, harap nonaktifkan atau hapus instalan untuk pengguna yang relevan.）"
+  echo -e "${Green}33.${Font} pencopotan pemasangan Xray"
+  echo -e "${Green}34.${Font} perbarui Xray-core"
+  echo -e "${Green}35.${Font} pemasangan Xray-core versi beta (Pre)"
+  echo -e "${Green}36.${Font} Memperbarui Sertifikat SSL Secara Manual"
+  echo -e "${Green}40.${Font} batalkan"
+  read -rp "Silakan masukkan nomor：" menu_num
   case $menu_num in
   0)
     update_sh
@@ -734,7 +734,7 @@ menu() {
     install_xray_ws
     ;;
   11)
-    read -rp "请输入 UUID:" UUID
+    read -rp "Silakan masukkan UUID:" UUID
     if [[ ${shell_mode} == "tcp" ]]; then
       modify_UUID
     elif [[ ${shell_mode} == "ws" ]]; then
@@ -749,12 +749,12 @@ menu() {
     ;;
   14)
     if [[ ${shell_mode} == "ws" ]]; then
-      read -rp "请输入路径(示例：/wulabing/ 要求两侧都包含 /):" WS_PATH
+      read -rp "Silakan masuk ke jalur(contoh：/wulabing/ Membutuhkan kedua sisi untuk memuat /):" WS_PATH
       modify_fallback_ws
       modify_ws
       restart_all
     else
-      print_error "当前模式不是 Websocket 模式"
+      print_error "Model saat ini tidak Websocket pola pikir (paradigma)"
     fi
     ;;
   21)
@@ -771,7 +771,7 @@ menu() {
         basic_ws_information
       fi
     else
-      print_error "xray 配置文件不存在"
+      print_error "xray File konfigurasi tidak ada"
     fi
     ;;
   31)
@@ -800,7 +800,7 @@ menu() {
     exit 0
     ;;
   *)
-    print_error "请输入正确的数字"
+    print_error "Masukkan nomor yang benar"
     ;;
   esac
 }
