@@ -1,5 +1,5 @@
 
-## Xray 基于 Nginx 的 VLESS + XTLS 一键安装脚本 <img src="https://raw.githubusercontent.com/wulabing/Xray_onekey/main/image/project_xray.jpg" alt="Project_Xray" width="122" height="30" align="bottom" />
+## Xray 基于 Nginx 的 VLESS + XTLS Skrip Instalasi Satu-Klik <img src="https://raw.githubusercontent.com/wulabing/Xray_onekey/main/image/project_xray.jpg" alt="Project_Xray" width="122" height="30" align="bottom" />
 
 
 > 感Terima kasih kepada JetBrains yang telah menyediakan lisensi pengembangan perangkat lunak sumber terbuka non-komersial!
@@ -29,7 +29,7 @@ Metode konfigurasi yang didukung
 - VLESS + TCP + TLS + Nginx + WebSocket
 
 ```
-wget -N --no-check-certificate -q -O install.sh "https://raw.githubusercontent.com/wulabing/Xray_onekey/nginx_forward/install.sh" && chmod +x install.sh && bash install.sh
+wget -N --no-check-certificate -q -O install.sh "https://raw.githubusercontent.com/yudhapermana-yt/Xray_onekey-bahasa-indonesia/nginx_forward/install.sh" && chmod +x install.sh && bash install.sh
 ```
 
 ### Metode pemasangan/pembaruan (bagian depan Xray)
